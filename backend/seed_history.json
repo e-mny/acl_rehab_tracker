@@ -1,0 +1,264 @@
+[
+  {
+    "date": "2026-10-07",
+    "knee": 44.7,
+    "above5": 46.1,
+    "above15": 56,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-08 at 11:03 (Asia/Singapore); measurement date as written in message.",
+    "other_knee": 37,
+    "other_above5": 42,
+    "other_above15": 50
+  },
+  {
+    "date": "2026-10-08",
+    "knee": 44,
+    "above5": 46,
+    "above15": 54.5,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-08 at 11:04 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-09",
+    "knee": 45.2,
+    "above5": 47.5,
+    "above15": 55.9,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-09 at 10:57 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-10",
+    "knee": 44.9,
+    "above5": 46,
+    "above15": 55,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-10 at 11:36 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-11",
+    "knee": 44,
+    "above5": 44.5,
+    "above15": 54,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-11 at 11:15 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-12",
+    "knee": 43,
+    "above5": 44.5,
+    "above15": 51.9,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-12 at 09:38 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-13",
+    "knee": 42.8,
+    "above5": 42.5,
+    "above15": 51.3,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-13 at 11:44 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-14",
+    "knee": 41.7,
+    "above5": 42,
+    "above15": 50.4,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-14 at 12:04 (Asia/Singapore); measurement date as written in message.",
+    "other_knee": 37,
+    "other_above5": 39.8,
+    "other_above15": 49
+  },
+  {
+    "date": "2026-10-15",
+    "knee": 41.9,
+    "above5": 42,
+    "above15": 49,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-15 at 11:08 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-16",
+    "knee": 40.5,
+    "above5": 41.5,
+    "above15": 49.5,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-16 at 13:14 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-17",
+    "knee": 40.5,
+    "above5": 41,
+    "above15": 48.7,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-17 at 12:20 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-18",
+    "knee": 39.7,
+    "above5": 40.7,
+    "above15": 46.6,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-18 at 10:24 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-19",
+    "knee": 39.7,
+    "above5": 41,
+    "above15": 47,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-19 at 10:44 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-20",
+    "knee": 39.9,
+    "above5": 41.1,
+    "above15": 49,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-20 at 10:32 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-21",
+    "knee": 40,
+    "above5": 41.2,
+    "above15": 47.5,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-21 at 15:50 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-22",
+    "knee": 40.5,
+    "above5": 41.6,
+    "above15": 48.8,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-22 at 12:10 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-23",
+    "knee": 39,
+    "above5": 39.9,
+    "above15": 46,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-23 at 11:50 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-24",
+    "knee": 38.8,
+    "above5": 39.6,
+    "above15": 45.8,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-24 at 11:23 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-25",
+    "knee": 38.8,
+    "above5": 39.6,
+    "above15": 45.7,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-25 at 09:55 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-26",
+    "knee": 39,
+    "above5": 40.2,
+    "above15": 45.9,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-26 at 10:24 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-27",
+    "knee": 39.5,
+    "above5": 40.2,
+    "above15": 47.2,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-27 at 13:26 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-28",
+    "knee": 38.9,
+    "above5": 39.7,
+    "above15": 46.4,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-28 at 09:40 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-29",
+    "knee": 38.6,
+    "above5": 39.4,
+    "above15": 45.8,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-29 at 10:14 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-30",
+    "knee": 38.5,
+    "above5": 39,
+    "above15": 45.3,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-30 at 10:19 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-10-31",
+    "knee": 38.2,
+    "above5": 38.9,
+    "above15": 45.3,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-10-31 at 07:38 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-01",
+    "knee": 38.8,
+    "above5": 39.4,
+    "above15": 44.4,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-01 at 08:08 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-02",
+    "knee": 39,
+    "above5": 39.3,
+    "above15": 45.3,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-02 at 09:19 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-03",
+    "knee": 38.9,
+    "above5": 39.6,
+    "above15": 45.8,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-03 at 11:33 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-04",
+    "knee": 38.7,
+    "above5": 38.4,
+    "above15": 44.6,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-04 at 10:26 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-05",
+    "knee": 38,
+    "above5": 38.8,
+    "above15": 45.7,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-05 at 11:54 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-06",
+    "knee": 38.1,
+    "above5": 38.6,
+    "above15": 45.1,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-06 at 10:29 (Asia/Singapore); measurement date as written in message."
+  },
+  {
+    "date": "2026-11-07",
+    "knee": 38.3,
+    "above5": 38,
+    "above15": 44.2,
+    "source": "manual",
+    "notes": "Imported from message history. First measurement site: just above kneecap. Message sent 2026-11-07 at 11:03 (Asia/Singapore); measurement date as written in message."
+  }
+]

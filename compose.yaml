@@ -1,0 +1,59 @@
+services:
+  stride:
+    build: .
+    image: stride-rehab:local
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${PORT:-8080}:8000"
+    volumes:
+      - stride_data:/data
+    environment:
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      TZ: "${TZ:-Asia/Singapore}"
+      POSE_ANALYZER_URL: "http://pose:8001"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+
+  telegram:
+    profiles: [telegram]
+    build:
+      context: .
+      dockerfile: integrations/telegram/Dockerfile
+    environment:
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      TELEGRAM_ALLOWED_USER_ID: "${TELEGRAM_ALLOWED_USER_ID:-}"
+      STRIDE_API_TOKEN: "${STRIDE_API_TOKEN:-}"
+      STRIDE_API_URL: http://stride:8000
+    volumes:
+      - telegram_data:/bot-data
+    depends_on:
+      stride:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  pose:
+    profiles: [pose]
+    build:
+      context: .
+      dockerfile: integrations/pose/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  stride_data:
+  telegram_data:
