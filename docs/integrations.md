@@ -1,6 +1,6 @@
 # Optional integrations
 
-Both integrations run next to Stride in Docker. Only Stride publishes a host port. The Telegram bot makes outbound HTTPS requests, and photo analysis runs locally on the CPU. Each integration is enabled through its own Compose profile.
+Stride supports a Telegram input worker and a local pose-analysis service. Both run alongside the core application through Docker Compose profiles. Only the core application publishes a host port.
 
 ## Local photo analysis
 
@@ -9,151 +9,231 @@ docker compose --profile pose up -d --build
 docker compose --profile pose ps
 ```
 
-The first build downloads a versioned MediaPipe Pose Landmarker Lite model and verifies its SHA-256. It is then bundled inside the image; inference makes no external requests. Both Linux AMD64 (typical Proxmox) and ARM64 wheels are available for the pinned MediaPipe version.
+The image build downloads a versioned MediaPipe Pose Landmarker Lite model and verifies its SHA-256. The model is then bundled into the image; inference runs locally on the CPU and makes no external image-analysis requests.
 
-Open **Photo journal**. New photos and previously unprocessed stored photos are queued automatically when a leg is known. The queue lives in SQLite, survives app restarts, and waits while the optional pose service is offline. Photos with no selected leg show **Select leg to analyse**; choose one in the photo editor or set your recovering knee in Settings.
+New photos and unprocessed stored photos are queued when a leg is known. The SQLite queue survives application restarts and waits while the optional pose service is offline. Select a leg in the photo editor or configure the recovering knee in **Settings & data**.
 
-To measure a photo:
+### Reviewing a measurement
 
 1. Select **Flexion · bending** or **Extension · straightening**, and confirm the leg.
-2. Use the proposed alignment, or align the two goniometer arms manually: green along the thigh, amber along the shin. Their ends represent directions; they do not have to reach a visible hip or ankle. Drag the knee pivot to move both arms together. **Place knee pivot** lets you tap its position; **Swap thigh / shin** reverses the arm labels.
-3. Zoom from 100–300% and scroll the image for precision. Large drag targets, a magnifier, one-pixel nudge buttons, and arrow keys are available. Shift + arrow moves ten image pixels. Untouched starter guides cannot be logged as measurements.
-4. For extension, explicitly choose **Short of straight** (positive deficit) or **Beyond straight** (negative hyperextension). The image supplies an angle magnitude; this direction is user-confirmed, not inferred by the model.
-5. Review the measurement type, leg, alignment, date and direction, check the review box, and select **Save flexion measurement** or **Save extension measurement**. An existing different value requires an additional replacement confirmation. Concurrent edits invalidate the preview.
+2. Review the proposed alignment, or align the two arms manually: green follows the thigh and amber follows the shin. Their ends indicate directions and do not have to reach a visible hip or ankle.
+3. Drag the knee pivot to move both arms together. Use **Place knee pivot** to tap its position, or **Swap thigh / shin** to reverse the arm labels.
+4. Use zoom, the magnifier, one-pixel nudge buttons or arrow keys for precision. Shift + arrow moves ten image pixels. Untouched starter guides cannot be logged.
+5. For extension, select **Short of straight** for a positive deficit or **Beyond straight** for negative hyperextension. The model does not infer this sign.
+6. Review the type, leg, alignment, date and direction, then save the selected measurement. Replacing a different existing value requires confirmation. Concurrent edits invalidate an outdated preview.
 
-**Save alignment only** saves the photo's guides and type without changing a daily metric. Logging changes only the selected field: extension never overwrites flexion, and flexion never overwrites extension. Other metrics and notes are preserved. Evidence stores the selected metric, signed value, direction, reviewed alignment, photo/entry link, model provenance when used, and timestamp. Legacy photo measurements remain labelled as legacy flexion logs; choosing a new photo type never silently reclassifies or deletes them.
+**Save alignment only** stores annotations without updating daily measurements. Logging changes only the selected metric and preserves other values and notes. The evidence records the metric, signed value, direction, reviewed points, photo/entry link, available model provenance and review time.
 
-**Analyse all photos** queues unprocessed photos and retries failures, skipping ready proposals, active jobs and photos already logged. Select a batch leg to override saved defaults if needed. **Review photos** steps through photos that have not been logged. Photos that cannot be detected offer manual arm alignment. Existing saved alignments are never replaced by a background proposal. In the editor, a new proposal replaces starter guides only if you have not adjusted them; **Use detected alignment** explicitly applies a proposal when you have already edited an alignment.
+Changing a photo's type does not move or delete a previously logged measurement. Older logs without an explicit metric remain labelled as legacy flexion records.
 
-The model still works best on a side-on image containing one person with hip, knee and ankle visible. Cropped leg-only images can fail its person-detection step. Failures now explain whether no body pose, multiple people or hidden landmarks caused rejection. Manual thigh/shin axis alignment works without an off-screen hip. Confidence/visibility scores are not measures of clinical angle accuracy.
+### Batch analysis and manual fallback
 
-Angles are recomputed on the server in image pixels to account for image aspect ratio. Knee bend is `180° − angle(thigh arm, knee pivot, shin arm)`. Flexion uses this non-negative value. Extension uses the same magnitude with your explicitly selected sign, in the existing supported range −30° to +90°. These 2D estimates are not clinically validated; check your technique against your physio's measurement and use a consistent setup. Automated circumference estimation is not included.
+**Analyse all photos** queues unprocessed photos and retries failures, skipping ready proposals, active jobs and photos already logged. A batch leg selection can override saved defaults. **Review photos** steps through photos that have not been logged.
 
-No GPU passthrough or extra host ports are required. Manual alignment continues to work when the pose service is offline. To leave the service enabled for ordinary Compose commands, set `COMPOSE_PROFILES=pose` in `.env`.
+Background proposals do not replace saved alignments. In an open editor, a proposal replaces starter guides only if no manual adjustments have been made. **Use detected alignment** explicitly applies a proposal over an edited alignment.
+
+Detection works best with one person in a side-on image and the hip, knee and ankle visible. Cropped leg-only images may fail the model's person-detection step. Failure messages distinguish missing body poses, multiple people and hidden landmarks. Manual thigh/shin alignment remains available without an off-screen hip point.
+
+Angles are recomputed on the server using image pixels to account for aspect ratio:
+
+```text
+knee bend = 180° − angle(thigh arm, knee pivot, shin arm)
+```
+
+Flexion uses the non-negative angle. Extension uses the same magnitude with the explicitly selected sign, within the supported range of −30° to +90°. Visibility scores are not measures of clinical accuracy. These 2D estimates are not clinically validated; use a consistent setup and check measurement technique with a qualified clinician. Circumference estimation from photos is not implemented.
+
+Manual alignment works without the pose service. To enable the service for subsequent Compose commands, set `COMPOSE_PROFILES=pose` in `.env`.
 
 ## Telegram setup
 
-1. In Telegram, create a bot through **@BotFather → /newbot**. Copy the bot token into your local `.env` file. Do not commit that file.
-2. In Stride, open **Settings & data → Integrations → Create token**. Copy it to the same `.env` file.
-3. Configure:
+1. Create a bot through [@BotFather](https://t.me/BotFather) using `/newbot`.
+2. Generate a Stride token in **Settings & data → Integrations → Create token**.
+3. Add the credentials and allowed numeric Telegram user ID to the deployment's untracked `.env` file:
 
 ```dotenv
-TELEGRAM_BOT_TOKEN=your-bot-token
-TELEGRAM_ALLOWED_USER_ID=your-numeric-telegram-user-id
-STRIDE_API_TOKEN=your-stride-token
+TELEGRAM_BOT_TOKEN=REPLACE_WITH_BOT_TOKEN
+TELEGRAM_ALLOWED_USER_ID=REPLACE_WITH_NUMERIC_USER_ID
+STRIDE_API_TOKEN=REPLACE_WITH_STRIDE_API_TOKEN
 ```
 
-To find your own numeric ID without using a third-party bot, send `/start` to your new bot and run this read-only helper:
+These are placeholders, not working credentials. Do not commit real values.
+
+### Finding the allowed user ID
+
+Send `/start` to the new bot, then run the read-only setup helper before starting the worker:
 
 ```sh
 docker compose --profile telegram build telegram
 docker compose --profile telegram run --rm --no-deps telegram python -m integrations.telegram.bot --whoami
 ```
 
-The helper reads pending private-chat updates and prints sender IDs; it sends no messages. Do this before starting polling, and remove any previously configured webhook if you reused an existing bot. Set `TELEGRAM_ALLOWED_USER_ID` to your own ID, then start:
+The helper reads pending private-chat updates and prints sender IDs; it sends no messages. Set `TELEGRAM_ALLOWED_USER_ID` to the intended owner's numeric ID. If reusing a bot with a webhook, remove that webhook before using the helper.
+
+Start the worker:
 
 ```sh
 docker compose --profile telegram up -d --build
 docker compose --profile telegram logs --tail=50 telegram
 ```
 
-To run both integrations:
+To enable both integrations:
 
 ```sh
 docker compose --profile telegram --profile pose up -d --build
 ```
 
-Optionally set `COMPOSE_PROFILES=telegram,pose` in `.env` so both stay enabled in subsequent Compose commands. A service already started keeps running until stopped. Stop optional services explicitly when disabling them:
+Optionally set `COMPOSE_PROFILES=telegram,pose` in `.env`. Stop optional services explicitly when disabling them:
 
 ```sh
 docker compose --profile telegram stop telegram
 docker compose --profile pose stop pose
 ```
 
-## Sending check-ins
+Only one polling worker should run per bot token. The worker ignores other users and group chats.
 
-Send one date per message. Your existing format is supported:
+## Message formats
+
+The following examples use **fictional dates, measurements and notes** to demonstrate syntax. They are not rehabilitation targets or records to import.
+
+Labelled circumference measurements:
 
 ```text
-7/11/26
+15/1/2020
 bad side:
-just above knee cap: 38.3
-5cm above knee cap: 38.0
-15cm above knee cap: 44.2
+just above knee cap: 41.2
+5cm above knee cap: 43.7
+15cm above knee cap: 53.6
 
 good side:
-37cm
-39.8cm
-49cm
+40.0cm
+42.9cm
+52.7cm
 ```
 
-The shorter format is also supported:
+A shorter check-in:
 
 ```text
-7/11/26
-knee: 38.3
-+5: 38.0
-+15: 44.2
-pain: 2
-exercise: 30
-notes: Morning check-in
+2020-01-15
+knee: 41.2
++5: 43.7
++15: 53.6
+pain: 3
+exercise: 12
+notes: Example check-in for format demonstration.
 ```
 
-These are syntax examples, not new records to import. Only include measurements actually taken on that date. `pain` means pain at rest; use `pain_activity` for pain with activity. The parser also accepts `flexion`, `extension`, `stiffness`, `steps`, `sleep`, `instability`, and explicitly named `other_knee`, `other_above5`, `other_above15`. Use decimal points and the labelled units. Telegram notes are limited to 2,000 characters so the full new note fits in the confirmation preview. Invalid, duplicate or unknown metric labels are rejected rather than guessed.
+Send one date per message and only include measurements taken on that date. The parser also accepts `flexion`, `extension`, `pain_activity`, `stiffness`, `steps`, `sleep`, `instability`, `other_knee`, `other_above5` and `other_above15`. `pain` means pain at rest. Use decimal points and the labelled units. Unknown labels, duplicate metrics and invalid values are rejected.
 
-Dates use day/month/year, or ISO `YYYY-MM-DD`. If omitted, the message timestamp is converted using your journal's time zone. The bot shows a preview and **Save / Cancel** buttons. Existing values that change are shown as old → new. Only the supplied fields change. Notes you do not supply remain untouched; if you supply `notes:`, that replaces the existing note after confirmation.
+Dates use day/month/year or ISO `YYYY-MM-DD`. If omitted, the message timestamp is converted using the journal's configured time zone. Telegram notes are limited to 2,000 characters so the full new note fits in the confirmation preview.
 
-If an entry changes after the preview, the bot presents an updated preview and requires Save again. Entries use `source: telegram`. Zero values are preserved. Repeated deliveries and retries use API idempotency keys to avoid duplicate records. Drafts and polling offsets live in the separate `telegram_data` volume and survive container restarts. Drafts expire after 24 hours and are cleaned up after 30 days.
+The bot displays **Save / Cancel** buttons before writing data. Existing values that change appear as old → new. Omitted fields remain unchanged. Providing `notes:` replaces the existing note after confirmation.
 
-Commands: `/help`, `/log` (optional prefix for a multiline check-in), `/cancel` (latest pending draft), and `/whoami`. The worker silently ignores other users and group chats. One polling worker should run per bot token.
+If an entry changes after the preview, the worker presents an updated preview and requests confirmation again. Submitted entries use `source: telegram`. API idempotency keys protect against duplicate writes during retries. Drafts and polling offsets persist in the `telegram_data` volume. Drafts expire after 24 hours and are cleaned up after 30 days.
+
+Available commands:
+
+| Command | Action |
+| --- | --- |
+| `/help` | Show accepted formats. |
+| `/log` | Optional prefix for a multiline check-in. |
+| `/cancel` | Cancel the latest pending draft. |
+| `/whoami` | Show the allowed user's numeric Telegram ID. |
 
 ## Telegram photos
 
-Send a photo or JPEG/PNG/WebP document, optionally with a caption:
+Send a photo or JPEG, PNG or WebP document with an optional caption. This example is fictional:
 
 ```text
-7/11/26
-Side-on flexion reference
+2020-01-15
+Example side-on image caption.
 ```
 
-After you confirm Save, the bot downloads the image and uploads it to Stride. The same 12 MB upload limit, decoding, resizing and metadata removal apply. Image documents retain more original quality than Telegram-compressed photo messages. Photo cards show their Telegram source. The uploaded photo is automatically queued for local analysis when your recovering side is configured. Open it in Stride, select Flexion or Extension, and review before logging.
+After confirmation, the worker downloads the image and uploads it to Stride. The application's 12 MB limit, image decoding, resizing and metadata removal apply. Image documents can retain more original quality than Telegram-compressed photo messages.
 
-Messages and images sent to the bot pass through Telegram. Direct browser uploads and local model inference stay on your own server. Confirmed Telegram uploads are analysed through the same durable server queue. The bot never automatically logs an angle.
+Confirmed uploads use the same background analysis queue as browser uploads. Select the measurement type and review the alignment in **Photo journal** before logging an angle. Telegram does not automatically save a derived measurement.
 
-## API additions
+Messages and images sent through the bot pass through Telegram. Direct browser uploads and local inference remain on the deployment server.
 
-- `POST /api/entries/preview`: body `{ "date": "YYYY-MM-DD", "values": { ...partial fields... } }`. Returns the proposed merged entry, existing entry and a version string. Writes nothing.
-- `PATCH /api/entries/by-date/{date}`: partial fields, creates a date if absent. Optional `If-Match` must equal the preview's version (`new` for an absent date). A conflict returns 409.
-- `Idempotency-Key` on PATCH, photo upload and photo apply: a repeated identical request returns the original response. Reusing a key for different data returns 409.
-- `POST /api/photos/{id}/queue`: queues a photo for background analysis using `{ "side": "left" }` or `right`. Existing ready proposals and failures on the same leg are not retried by this route.
-- `POST /api/photos/analyze-batch`: optional `photo_ids`, optional `side`, and `retry_failed` (default true). Returns queued, skipped and needs-side IDs.
-- `POST /api/photos/{id}/analyze`: body `{ "side": "left" }` or `right`. Stores a proposal with model/version, points, visibility and computed angle. Daily entries remain unchanged.
-- `POST /api/photos/{id}/apply`: body includes `date`, `caption`, `side`, three normalized `points`, `reviewed: true`, and `expected_version` from an entry preview. Also pass `metric` (`flexion` or `extension`, default flexion for legacy clients), `extension_direction` (`deficit` or `hyperextension`, required for extension), and optional `analysis_id` when the reviewed alignment originated from a proposal. The server recomputes signed geometry; an arbitrary supplied angle is never used.
-- `GET /api/integrations`: authenticated pose availability and Telegram heartbeat status. The Telegram worker sends an authenticated heartbeat every polling cycle; the UI considers it online for 120 seconds after the last heartbeat.
+## API routes
 
-All journal routes retain normal authentication. Workers do not need access to password hashes or journal files. Only the pose worker receives a stored image through Stride's internal request.
+The authenticated reference is at `/api/docs`, with the OpenAPI schema at `/api/openapi.json`. Send `Authorization: Bearer TOKEN` for token-based access. The token is shown once when generated and only its hash is stored.
 
-## Credentials, maintenance and testing
+| Route | Purpose |
+| --- | --- |
+| `POST /api/entries/preview` | Validate and merge partial fields without writing data. |
+| `PATCH /api/entries/by-date/{date}` | Update supplied fields or create a missing date. |
+| `POST /api/photos` | Upload a private photo. |
+| `POST /api/photos/{id}/queue` | Queue analysis of a stored photo. |
+| `POST /api/photos/analyze-batch` | Queue a batch of proposals. |
+| `POST /api/photos/{id}/analyze` | Request a landmark proposal for a selected leg. |
+| `POST /api/photos/{id}/apply` | Log an explicitly reviewed photo measurement. |
+| `GET /api/integrations` | Report pose availability and Telegram heartbeat status. |
 
-A new Stride API token replaces the old one. After changing `.env`, recreate the Telegram service with `docker compose --profile telegram up -d telegram`; `docker compose restart` alone does not reload environment values. Revoking a token stops API access immediately. No credentials or token-bearing request URLs are logged by the bot's error handlers.
+Entry previews accept `date` and `values`, and return the merged entry, existing entry and a version string. Supply that version in `If-Match` when patching to reject conflicting edits; `new` identifies an absent entry. Conflicts return HTTP 409.
 
-`stride_data` still contains your journal and photos. `telegram_data` contains offsets and drafts; include it in server backups if you need pending drafts restored. Losing bot state does not delete journal data. Avoid restoring bot state independently to a point earlier than the journal; keep both volumes together in a VM backup. `.env` is separate and must be saved privately if you want credentials restored.
+PATCH, photo upload and photo application support `Idempotency-Key`. Repeating an identical request with the same key returns the original result. Reusing the key for a different request returns HTTP 409.
 
-Tests exercise parsing, confirmation, allowlisting, cancellation/conflicts, retry idempotency, restart state, uploads, proposal isolation and reviewed photo application using a mocked Telegram API and disposable SQLite databases:
+Photo uploads use multipart fields `file`, `photo_date`, optional `caption`, optional `side`, and optional `measurement_type`. Analysis and queue requests use `side: left` or `right`. The queue route does not retry an existing ready proposal or failure on the same leg. Batch requests accept optional `photo_ids`, optional `side` and `retry_failed` (default `true`), and return queued, skipped and needs-side IDs.
+
+Reviewed photo application requires `date`, `caption`, `side`, three normalized `points`, `reviewed: true` and `expected_version`. Include `metric` as `flexion` or `extension`; legacy clients default to flexion. Extension also requires `extension_direction` as `deficit` or `hyperextension`. Optional `analysis_id` links model provenance. The server recomputes geometry rather than trusting a supplied angle.
+
+Only the selected daily metric changes. The server records the evidence with the photo in the same transaction. A proposal alone never changes a daily entry.
+
+## Credentials and maintenance
+
+Creating a new Stride API token replaces the previous one. After editing `.env`, recreate the Telegram service:
 
 ```sh
-.venv/bin/python -m pytest backend/tests -q
-npm run build --prefix frontend
+docker compose --profile telegram up -d telegram
 ```
 
-Browser tests require the disposable QA container described in the root README, with the pose service reachable over its Docker network to exercise successful automatic detection. They never use the live journal. Actual live Telegram delivery requires your own configured credentials and a private message to your bot.
+A container restart alone does not reload environment values. Revoking a token removes API access immediately. The connection indicator uses the worker's authenticated heartbeat and considers it online for 120 seconds after the last heartbeat.
 
-For a successful model/browser integration check using a disposable QA instance, enable the pose service first and start QA on the same network:
+The `stride_data` volume contains journal records, photos and analysis jobs. `telegram_data` contains drafts and polling state. Back up both together when pending drafts must be restored consistently. Save configuration separately and privately. See the [privacy and publication notes](privacy.md) before sharing logs, screenshots, repositories or images.
+
+## Browser tests
+
+Browser tests create an account and modify records. Run them only against disposable data. Review initialization files and test fixtures before publishing or distributing a test image.
+
+Build the application image, then start an isolated QA instance from the repository root:
 
 ```sh
-docker run -d --name stride-qa --network acl_rehab_tracker_default -p 127.0.0.1:18080:8000 -e POSE_ANALYZER_URL=http://pose:8001 --mount type=volume,src=stride_qa_data,dst=/data stride-rehab:local
+docker compose build stride
+docker network create stride-qa-net
+docker run -d --name stride-qa --network stride-qa-net -p 127.0.0.1:18080:8000 --mount type=volume,src=stride_qa_data,dst=/data stride-rehab:local
 cd frontend
-STRIDE_POSE_TEST_IMAGE=/absolute/path/to/a/test-photo.jpg npm run test:e2e
+npx playwright install chromium
+npm run test:e2e
 ```
 
-Use the actual Compose network name if you renamed the project. Without `STRIDE_POSE_TEST_IMAGE`, the successful pose browser test is skipped; backend isolation/review tests still run. A full-body test image must have the selected hip, knee and ankle visible for detection. Test data is disposable and is edited by the browser test.
+Pose-dependent browser tests are skipped unless `STRIDE_POSE_TEST_IMAGE` is provided. For a full check, first build and run a local pose worker on the same QA network:
+
+```sh
+# From the repository root:
+docker build -f integrations/pose/Dockerfile -t stride-pose:qa .
+docker run -d --name stride-pose-qa --network stride-qa-net stride-pose:qa
+```
+
+Recreate only the disposable application container with the QA worker URL, then run the full browser checks:
+
+```sh
+# From the repository root:
+docker rm -f stride-qa
+docker run -d --name stride-qa --network stride-qa-net -p 127.0.0.1:18080:8000 -e POSE_ANALYZER_URL=http://stride-pose-qa:8001 --mount type=volume,src=stride_qa_data,dst=/data stride-rehab:local
+cd frontend
+STRIDE_POSE_TEST_IMAGE=/path/to/synthetic-or-consented-test-image.jpg npm run test:e2e
+```
+
+Use a test image with visible hip, knee and ankle landmarks. Do not publish private photos or generated screenshots. `STRIDE_TEST_URL` can override the test endpoint; never set it to a live journal.
+
+After testing, remove only the disposable resources:
+
+```sh
+docker rm -f stride-qa
+# If the optional QA pose worker was started:
+docker rm -f stride-pose-qa
+docker volume rm stride_qa_data
+docker network rm stride-qa-net
+```
+
+The backend tests use temporary databases and a mocked Telegram API. Live Telegram delivery requires separately configured credentials and a private message to the bot.
