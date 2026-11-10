@@ -10,3 +10,6 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 bot-data/
+.deploy-state/
+.env.*
+!.env.example

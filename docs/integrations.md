@@ -53,6 +53,8 @@ Manual alignment works without the pose service. To enable the service for subse
 ```dotenv
 TELEGRAM_BOT_TOKEN=REPLACE_WITH_BOT_TOKEN
 TELEGRAM_ALLOWED_USER_ID=REPLACE_WITH_NUMERIC_USER_ID
+# Optional: allow the same user to log from one group as well.
+TELEGRAM_ALLOWED_GROUP_ID=
 STRIDE_API_TOKEN=REPLACE_WITH_STRIDE_API_TOKEN
 ```
 
@@ -68,6 +70,31 @@ docker compose --profile telegram run --rm --no-deps telegram python -m integrat
 ```
 
 The helper reads pending private-chat updates and prints sender IDs; it sends no messages. Set `TELEGRAM_ALLOWED_USER_ID` to the intended owner's numeric ID. If reusing a bot with a webhook, remove that webhook before using the helper.
+
+### Using the bot in a group
+
+Add the bot to the intended group and set `TELEGRAM_ALLOWED_GROUP_ID` in the deployment's untracked `.env` to that group's negative numeric ID. Leave it empty for private-chat access only. Recreate the worker after changing configuration:
+
+```sh
+docker compose --profile telegram up -d --build telegram
+```
+
+`TELEGRAM_ALLOWED_USER_ID` still controls who can submit measurements, upload photos, and press Save or Cancel. Other group members cannot write to the journal. Both the owner's private chat and the configured group remain available. Entries from both chats go into the same journal.
+
+Keep [Telegram group privacy mode](https://core.telegram.org/bots/faq#what-messages-will-my-bot-get) enabled. Replace `YourBotUsername` below with the bot's actual username, and send this as one message (the measurements are fictional):
+
+```text
+/log@YourBotUsername
+knee: 41.2
++5: 43.7
++15: 53.6
+```
+
+Alternatively, send `/help@YourBotUsername`, then reply directly to the bot's response with measurements or a photo. Replies let the bot receive photo messages while privacy mode is enabled. Ordinary group conversation is ignored. You can also prefix a photo caption with `/log@YourBotUsername`, with its optional date on the following line.
+
+Previews, Save/Cancel buttons, and confirmations appear in the originating chat and forum topic. Drafts and `/cancel` are scoped to that chat/topic. Only the configured user can act on buttons, and a draft cannot be saved from another chat or topic. `/whoami@YourBotUsername` displays the user and current chat IDs after the group is configured.
+
+Group members can see the submitted measurements, photos, previews, and replies, including previous values shown in an update preview. Use private chat when those details should stay out of the group. Anonymous administrator messages cannot be matched to the allowed user; send as your personal account.
 
 Start the worker:
 
@@ -136,8 +163,8 @@ Available commands:
 | --- | --- |
 | `/help` | Show accepted formats. |
 | `/log` | Optional prefix for a multiline check-in. |
-| `/cancel` | Cancel the latest pending draft. |
-| `/whoami` | Show the allowed user's numeric Telegram ID. |
+| `/cancel` | Cancel the latest pending draft in the current chat/topic. |
+| `/whoami` | Show the allowed user's numeric Telegram ID and current chat ID. |
 
 ## Telegram photos
 
@@ -188,6 +215,8 @@ docker compose --profile telegram up -d telegram
 ```
 
 A container restart alone does not reload environment values. Revoking a token removes API access immediately. The connection indicator uses the worker's authenticated heartbeat and considers it online for 120 seconds after the last heartbeat.
+
+Run only one polling worker per bot token, including across development machines and production servers. Repeated Telegram HTTP 409 errors with no webhook configured indicate competing polling instances. Stop the duplicate worker, then rebuild and recreate the worker on the intended host. The heartbeat confirms journal connectivity; check worker logs separately for Telegram polling errors.
 
 The `stride_data` volume contains journal records, photos and analysis jobs. `telegram_data` contains drafts and polling state. Back up both together when pending drafts must be restored consistently. Save configuration separately and privately. See the [privacy and publication notes](privacy.md) before sharing logs, screenshots, repositories or images.
 

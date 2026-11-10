@@ -28,6 +28,7 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
       TELEGRAM_ALLOWED_USER_ID: "${TELEGRAM_ALLOWED_USER_ID:-}"
+      TELEGRAM_ALLOWED_GROUP_ID: "${TELEGRAM_ALLOWED_GROUP_ID:-}"
       STRIDE_API_TOKEN: "${STRIDE_API_TOKEN:-}"
       STRIDE_API_URL: http://stride:8000
     volumes:

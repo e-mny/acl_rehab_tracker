@@ -102,7 +102,7 @@ def test_parser_existing_format_and_errors():
     assert photo_caption('7/11/26\nSide-on reference', '2026-10-01') == ('2026-11-07', 'Side-on reference')
 
 
-def make_bot(client, tmp_path):
+def make_bot(client, tmp_path, *, group_id=None, sent_payloads=None):
     login(client)
     token = client.post('/api/token').json()['token']
     client.cookies.clear()
@@ -117,10 +117,15 @@ def make_bot(client, tmp_path):
             return httpx.Response(200, content=image.getvalue())
         payload = json.loads(request.content)
         method = request.url.path.rsplit('/', 1)[-1]
-        if method == 'sendMessage': sent.append(payload['text'])
+        if method == 'sendMessage':
+            sent.append(payload['text'])
+            if sent_payloads is not None:
+                sent_payloads.append(payload)
         return httpx.Response(200, json={'ok': True, 'result': {'file_path': 'photos/file.png'} if method == 'getFile' else {}})
     http = httpx.Client(transport=httpx.MockTransport(route))
-    return Bot('fake-token', 123, 'http://stride', token, tmp_path / 'bot', client=http), sent, token
+    bot = Bot('fake-token', 123, 'http://stride', token, tmp_path / 'bot', client=http, group_id=group_id)
+    bot.username, bot.bot_id = 'StrideTestBot', 456
+    return bot, sent, token
 
 
 def message(update_id, text='', **extra):

@@ -9,4 +9,13 @@ data
 **/test-results
 **/playwright-report
 backend/tests
+backend/seed_history.json
+frontend/tests
+bot-data
+.deploy-state
+.env.*
+!.env.example
+**/*.sqlite3
+**/*.sqlite3-wal
+**/*.sqlite3-shm
 *.zip

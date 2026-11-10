@@ -1,0 +1,12 @@
+[Unit]
+Description=Pull and reconcile the Stride image release
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/stride-updater.conf
+ExecStart=/usr/local/lib/stride/update.sh
+TimeoutStartSec=30min
+UMask=0077

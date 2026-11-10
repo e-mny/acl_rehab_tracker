@@ -11,7 +11,6 @@ WORKDIR /app
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home stride && mkdir /data && chown stride:stride /data
 COPY --chown=stride:stride backend/app.py ./backend/app.py
-COPY --chown=stride:stride backend/seed_history.json ./backend/seed_history.json
 COPY --chown=stride:stride backend/api_docs.html ./backend/api_docs.html
 COPY --from=frontend --chown=stride:stride /build/dist ./static
 USER stride

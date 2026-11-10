@@ -22,12 +22,15 @@ UNITS = {'knee': 'cm', 'above5': 'cm', 'above15': 'cm', 'flexion': '°|deg|degre
          'pain_rest': '/10', 'pain_activity': '/10', 'stiffness': 'min|minutes', 'exercise': 'min|minutes',
          'steps': 'steps', 'sleep': 'h|hrs|hours', 'instability': 'times|episodes'}
 INTEGERS = {'stiffness', 'exercise', 'steps', 'instability'}
-HELP = ('Send one day at a time, for example:\n7/11/26\nknee: 38.3\n+5: 38.0\n+15: 44.2\n'
+HELP = ('Send one day at a time, for example:\n/log\nknee: 41.2\n+5: 43.7\n+15: 53.6\n'
         'pain: 2\nnotes: Morning check-in\n\nYour existing bad side / good side format also works. '
         'Other optional fields: flexion, extension, pain_activity, stiffness, exercise, steps, sleep, instability. '
         'Pain means pain at rest. Dates use day/month/year; omit the date to use the message date in your journal time zone. '
         'Values must use cm, degrees, minutes or hours as labelled. Send a JPEG/PNG/WebP photo with an optional date on the first caption line. '
-        'Every entry and photo needs Save confirmation. /cancel cancels your latest pending draft. /whoami shows your user ID.')
+        'Every entry and photo needs Save confirmation. /cancel cancels your latest pending draft in this chat/topic. '
+        '/whoami shows your user and chat IDs. In groups, use /log@BotUsername followed by your measurements, '
+        'or reply to a message from this bot with measurements or a photo. Replace BotUsername with this bot\'s username. '
+        'Group previews and replies are visible to group members; only the allowed user can save.')
 
 
 def parse_date(text):
