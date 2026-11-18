@@ -1,18 +1,18 @@
 # Registry images and automatic updates
 
-GitHub Actions builds the application, Telegram worker and pose service and publishes them to GitHub Container Registry (GHCR). A timer on the Linux VM/LXC running Docker pulls new images every five minutes. No inbound deployment port or SSH access from GitHub is required.
+GitHub Actions builds the application, Telegram worker, pose service and Garmin worker and publishes them to GitHub Container Registry (GHCR). A timer on the Linux VM/LXC running Docker pulls new images every five minutes. No inbound deployment port or SSH access from GitHub is required.
 
 ```mermaid
 flowchart LR
     A[Push to main] --> B[Tests and builds]
-    B --> C[Three images in GHCR]
+    B --> C[Four images in GHCR]
     C --> D[Proxmox Docker VM/LXC checks for updates]
     D --> E[Recreate changed services using existing volumes]
 ```
 
 ## Publish the first images
 
-Commit the reviewed source changes, including `.github/workflows/images.yml`, and push to the repository's `main` branch. In **GitHub → Actions → Test and publish images**, wait for `checks`, all three `build` jobs and `promote` to finish.
+Commit the reviewed source changes, including `.github/workflows/images.yml`, and push to the repository's `main` branch. In **GitHub → Actions → Test and publish images**, wait for `checks`, all four `build` jobs and `promote` to finish.
 
 The workflow uses GitHub's built-in `GITHUB_TOKEN` with `packages: write`; no personal publishing token is required in repository secrets. Repository or organization policies must allow GitHub Actions and the workflow's package permissions. See [GitHub's GHCR publishing guide](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions).
 
@@ -23,10 +23,11 @@ For a repository named `OWNER/REPOSITORY`, images are named using lowercase valu
 | `ghcr.io/owner/repository-app:latest` | Web application and API |
 | `ghcr.io/owner/repository-telegram:latest` | Telegram input worker |
 | `ghcr.io/owner/repository-pose:latest` | Local photo analysis |
+| `ghcr.io/owner/repository-garmin:latest` | Optional scheduled Garmin step imports |
 
 Each image also receives `sha-FULL_GIT_COMMIT` for a specific source revision. Builds target `linux/amd64`, suitable for an x86 Proxmox Docker host. Pull requests run checks without publishing images. Manual workflow runs publish only when the selected branch is `main`.
 
-All three images must build successfully before the workflow promotes any `latest` tags. Registry tags are promoted sequentially; the updater rejects mixed source revisions during that brief window and retries at its next run.
+All four images must build successfully before the workflow promotes any `latest` tags. Registry tags are promoted sequentially; the updater rejects mixed source revisions during that brief window and retries at its next run.
 
 Published images exclude local `.env` files, databases, photos, historical seed records and test fixtures. Existing deployment volumes keep their records. Fresh deployments start with an empty journal. This image boundary does not sanitize tracked source files or Git history; see [publication privacy](privacy.md).
 
@@ -105,6 +106,8 @@ sudo docker compose -f compose.production.yaml ps
 ```
 
 The updater pulls all enabled images, checks their source revisions, and runs Compose with `--no-build --pull never --wait`. Compose recreates services whose images or configuration changed. Existing journal and Telegram volumes remain mounted. The web app and enabled pose service must pass their Docker health checks; the Telegram worker must remain running. Inspect its logs separately to verify Telegram connectivity.
+
+Enable the Garmin profile only after completing [its one-time login and volume setup](garmin.md). Its volume is independent of the journal and Telegram volumes.
 
 Only the Proxmox worker should use the live bot token. Leave any development-machine worker stopped. Repeated Telegram polling HTTP 409 errors usually indicate another polling worker using the same token.
 

@@ -12,6 +12,7 @@ The core application runs locally with Docker and SQLite. Telegram input and loc
 - A private photo journal with automatic alignment proposals, batch analysis and a manual two-arm measurement tool.
 - Explicit review before saving photo-derived flexion or extension estimates.
 - Password-protected access, API tokens, CSV exports and portable journal archives.
+- Optional Garmin step imports at 23:59, with historical backfill and recent-day reconciliation.
 - Optional Telegram logging in private chat or a configured group, with an authorized sender, confirmation buttons and protection against duplicate submissions.
 
 Stride records observations and does not prescribe exercises, diagnose conditions or determine readiness to progress rehabilitation. Photo-derived measurements are estimates from a 2D image and are not clinically validated. Follow an individual care plan from a qualified clinician.
@@ -55,7 +56,7 @@ Configure the journal's time zone and recovering knee separately in **Settings &
 
 Run Docker in a Linux VM on Proxmox, with a bridged network adapter and a reserved LAN address. For source builds, clone the repository into the VM and use the same Compose commands.
 
-For updates without copying source or building on the server, use the [GHCR image deployment and automatic updater](docs/deployment.md). GitHub Actions publishes the three images after a push to `main`, and an optional server timer pulls releases every five minutes using the existing data volumes.
+For updates without copying source or building on the server, use the [GHCR image deployment and automatic updater](docs/deployment.md). GitHub Actions publishes the four images after a push to `main`, and an optional server timer pulls releases every five minutes using the existing data volumes.
 
 Allow the configured application port from trusted LAN devices. For access beyond the LAN, use an appropriate VPN or HTTPS reverse proxy. Binding to `127.0.0.1` limits access to the Docker host; binding to the host's LAN address limits the service to that interface.
 
@@ -76,6 +77,8 @@ docker compose --profile telegram --profile pose up -d --build
 The Telegram worker uses outbound long polling and does not require a public webhook or an additional host port. The pose service runs locally and has no published host port.
 
 See the [integration guide](docs/integrations.md) for credential setup, message examples, photo review, API routes and troubleshooting. Messages and images sent through Telegram pass through Telegram's service. Direct browser uploads and local model inference remain on the deployment server.
+
+For automatic daily steps from Garmin Connect, see [Garmin setup and backfill](docs/garmin.md). The optional worker uses a saved login session and updates only each day’s steps.
 
 ## Using the journal
 

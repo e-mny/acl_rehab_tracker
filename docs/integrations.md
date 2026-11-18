@@ -1,6 +1,6 @@
 # Optional integrations
 
-Stride supports a Telegram input worker and a local pose-analysis service. Both run alongside the core application through Docker Compose profiles. Only the core application publishes a host port.
+Stride supports a Telegram input worker, a local pose-analysis service and a scheduled Garmin steps worker. See [Garmin setup and backfill](garmin.md) for daily imports and authentication. Both run alongside the core application through Docker Compose profiles. Only the core application publishes a host port.
 
 ## Local photo analysis
 
@@ -206,7 +206,9 @@ The authenticated reference is at `/api/docs`, with the OpenAPI schema at `/api/
 | `POST /api/photos/analyze-batch` | Queue a batch of proposals. |
 | `POST /api/photos/{id}/analyze` | Request a landmark proposal for a selected leg. |
 | `POST /api/photos/{id}/apply` | Log an explicitly reviewed photo measurement. |
-| `GET /api/integrations` | Report pose availability and Telegram heartbeat status. |
+| `GET /api/integrations` | Report pose, Telegram and Garmin integration status. |
+| `POST /api/integrations/garmin/steps` | Merge a date and integer step count without changing other entry fields. |
+| `POST /api/integrations/garmin/heartbeat` | Record the authenticated Garmin worker’s schedule and status. |
 
 Entry previews accept `date` and `values`, and return the merged entry, existing entry and a version string. Supply that version in `If-Match` when patching to reject conflicting edits; `new` identifies an absent entry. Conflicts return HTTP 409.
 

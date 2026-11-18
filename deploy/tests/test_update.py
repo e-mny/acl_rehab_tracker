@@ -12,8 +12,8 @@ SCRIPT = Path(__file__).resolve().parents[1] / 'update.sh'
 REVISION = 'a' * 40
 PREVIOUS = 'b' * 40
 CONFIG = {
-    'services': {name: {'image': f'example/{name}:latest'} for name in ('stride', 'telegram', 'pose')},
-    'volumes': {name: {'external': True, 'name': 'example_' + name} for name in ('stride_data', 'telegram_data')},
+    'services': {name: {'image': f'example/{name}:latest'} for name in ('stride', 'telegram', 'pose', 'garmin')},
+    'volumes': {name: {'external': True, 'name': 'example_' + name} for name in ('stride_data', 'telegram_data', 'garmin_data')},
 }
 
 FAKE_DOCKER = '''#!/usr/bin/env python3
@@ -41,7 +41,9 @@ elif args[:2] == ['image', 'inspect']:
     print(json.loads(os.environ['IMAGE_REVISIONS']).get(service, ''))
 elif args[:1] == ['inspect']:
     if '.Mounts' in args[2]:
-        print(os.environ.get('MOUNT_OVERRIDE', 'example_stride_data' if args[-1] == 'container-stride' else 'example_telegram_data'))
+        service = args[-1].removeprefix('container-')
+        actual = os.environ.get('GARMIN_MOUNT_OVERRIDE', 'example_garmin_data') if service == 'garmin' else 'example_' + service + '_data'
+        print(os.environ.get('MOUNT_OVERRIDE', actual))
     else:
         print(os.environ['PREVIOUS_REVISION'])
 else:
@@ -115,6 +117,12 @@ class UpdaterTests(unittest.TestCase):
         result = self.run_update(FAKE_CONFIG=json.dumps(config))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('container-telegram', self.log.read_text())
+        self.assertNotIn('container-garmin', self.log.read_text())
+
+    def test_garmin_auth_volume_is_preserved(self):
+        result = self.run_update(GARMIN_MOUNT_OVERRIDE='different-garmin-data')
+        self.assert_not_deployed(result)
+        self.assertIn('existing garmin data volume', result.stderr)
 
     def test_repeated_reconcile_keeps_rollback_revision(self):
         self.assertEqual(self.run_update().returncode, 0)

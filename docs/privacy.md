@@ -40,3 +40,5 @@ Messages and photos sent to the Telegram bot pass through Telegram's service bef
 Optional group access also makes submissions and bot replies visible to group members, including previous measurements shown in confirmation previews. The sender allowlist restricts who can write; it does not hide messages from group members. Keep real user and group IDs in the deployment's untracked configuration, and use private chat for private submissions.
 
 Exports and server backups contain private information even when credentials are excluded from an individual export format. Keep them outside public repositories and restrict access to their storage.
+
+The optional Garmin worker stores reusable account sessions and sync checkpoints in a separate private volume. Never distribute `garmin_tokens.json`, local `garmin-data/` contents or Garmin volume backups. The worker reads step totals from Garmin and imports them into the journal; source images and CI artifacts exclude the saved sessions.

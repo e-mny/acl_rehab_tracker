@@ -12,6 +12,8 @@ backend/tests
 backend/seed_history.json
 frontend/tests
 bot-data
+garmin-data
+**/garmin_tokens.json
 .deploy-state
 .env.*
 !.env.example

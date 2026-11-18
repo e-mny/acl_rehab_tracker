@@ -39,6 +39,25 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
+  garmin:
+    profiles: [garmin]
+    image: "${IMAGE_REPOSITORY:?Set IMAGE_REPOSITORY in .env}-garmin:${IMAGE_TAG:-latest}"
+    environment:
+      GARMIN_START_DATE: "${GARMIN_START_DATE:-}"
+      STRIDE_API_TOKEN: "${STRIDE_API_TOKEN:-}"
+      STRIDE_API_URL: http://stride:8000
+    volumes:
+      - garmin_data:/garmin-data
+    depends_on:
+      stride:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
   pose:
     profiles: [pose]
     image: "${IMAGE_REPOSITORY:?Set IMAGE_REPOSITORY in .env}-pose:${IMAGE_TAG:-latest}"
@@ -56,3 +75,6 @@ volumes:
   telegram_data:
     external: true
     name: "${TELEGRAM_DATA_VOLUME:?Set TELEGRAM_DATA_VOLUME to the existing bot volume}"
+  garmin_data:
+    external: true
+    name: "${GARMIN_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-acl_rehab_tracker}_garmin_data}"

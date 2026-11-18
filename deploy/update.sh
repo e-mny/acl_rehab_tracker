@@ -28,11 +28,11 @@ metadata=$(compose config --format json | python3 -c '
 import json, sys
 config = json.load(sys.stdin)
 for name, service in config["services"].items():
-    if name not in ("stride", "telegram", "pose") or "build" in service:
+    if name not in ("stride", "telegram", "pose", "garmin") or "build" in service:
         sys.exit("Expected the image-only Stride production configuration.")
     print("service", name, service["image"], sep="\t")
 for key, volume in config["volumes"].items():
-    if key not in ("stride_data", "telegram_data") or not volume.get("external"):
+    if key not in ("stride_data", "telegram_data", "garmin_data") or not volume.get("external"):
         sys.exit("Production volumes must be external.")
     print("volume", key, volume["name"], sep="\t")
 ')
@@ -45,9 +45,12 @@ while IFS=$'\t' read -r kind key value; do
   if [[ $key == stride_data ]]; then
     service=stride
     destination=/data
-  else
+  elif [[ $key == telegram_data ]]; then
     service=telegram
     destination=/bot-data
+  else
+    service=garmin
+    destination=/garmin-data
   fi
   container=$(compose ps -a -q "$service")
   if [[ -n $container ]]; then

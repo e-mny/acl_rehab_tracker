@@ -22,7 +22,13 @@ export type ExtensionDirection = 'deficit' | 'hyperextension' | '';
 export type PhotoAnalysis = { id?: string; status: 'queued' | 'running' | 'ready' | 'failed' | 'needs_side' | 'disabled'; side?: 'left' | 'right'; points?: Point[]; angle?: number; confidence?: number; model?: string; model_version?: string; detail?: string };
 export type PhotoMeasurement = { entry_id: string; date: string; value: number; metric?: 'flexion' | 'extension'; extension_direction?: ExtensionDirection; points: Point[]; side: 'left' | 'right'; reviewed_at: number; method: 'manual' | 'assisted'; model?: string; model_version?: string };
 export type Photo = { id: string; date: string; caption: string; source?: 'manual' | 'telegram' | 'api'; side?: 'left' | 'right' | 'unspecified'; measurement_type?: PhotoMode; extension_direction?: ExtensionDirection | null; measurement_value?: number | null; points?: Point[]; angle?: number | null; analysis?: PhotoAnalysis; measurements?: PhotoMeasurement[] };
-export type IntegrationStatus = { pose: { configured: boolean; available: boolean }; telegram: { online: boolean; username?: string; last_seen?: number } };
+export type IntegrationStatus = {
+  pose: { configured: boolean; available: boolean };
+  telegram: { online: boolean; username?: string; last_seen?: number };
+  garmin?: { online: boolean; state?: 'idle' | 'syncing' | 'error' | 'needs_login' | 'rate_limited';
+    imported_days: number; latest_date?: string | null; last_import_at?: number | null;
+    start_date?: string; timezone?: string; next_sync?: number; pending_days?: number; error_code?: string | null };
+};
 export type EntryPreview = { entry: Entry; existing: Entry | null; version: string };
 export const emptyProfile: Profile = { name: '', start_date: null, side: 'unspecified', context: '', timezone: 'Asia/Singapore' };
 export function today(timezone = 'Asia/Singapore') { return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }

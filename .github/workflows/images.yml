@@ -29,6 +29,7 @@ jobs:
           cache-dependency-path: |
             backend/requirements*.txt
             integrations/telegram/requirements.txt
+            integrations/garmin/requirements.txt
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -62,6 +63,8 @@ jobs:
             dockerfile: integrations/telegram/Dockerfile
           - service: pose
             dockerfile: integrations/pose/Dockerfile
+          - service: garmin
+            dockerfile: integrations/garmin/Dockerfile
     steps:
       - uses: actions/checkout@v6
         with:
@@ -115,8 +118,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           REVISION: ${{ github.sha }}
         run: |
-          for service in app telegram pose; do
+          for service in app telegram pose garmin; do
             image="ghcr.io/${REPOSITORY,,}-$service"
             docker buildx imagetools create --tag "$image:latest" "$image:sha-$REVISION"
           done
-          echo "Published revision $REVISION for app, telegram and pose." >> "$GITHUB_STEP_SUMMARY"
+          echo "Published revision $REVISION for app, telegram, pose and garmin." >> "$GITHUB_STEP_SUMMARY"
