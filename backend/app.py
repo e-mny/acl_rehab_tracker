@@ -704,7 +704,7 @@ def import_garmin_sleep(measurement: GarminSleep):
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
         exists = c.execute('SELECT 1 FROM entries WHERE date=?', (str(measurement.date),)).fetchone()
-        values = {'sleep': measurement.sleep_seconds / 3600}
+        values = {'sleep': round(measurement.sleep_seconds / 3600, 2)}
         if not exists:
             values['source'] = 'api'
         entry = merge_entry(c, measurement.date, values, write=True)['entry']

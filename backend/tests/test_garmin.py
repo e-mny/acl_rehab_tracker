@@ -257,14 +257,17 @@ def sleep_record(day, seconds=27000, **extra):
     return {'dailySleepDTO': {'calendarDate': day.isoformat(), 'sleepTimeSeconds': seconds, **extra}}
 
 
-def test_sleep_endpoint_is_authenticated_and_updates_only_sleep(client, integration):
-    payload = {'date': START.isoformat(), 'sleep_seconds': 27000}
+@pytest.mark.parametrize(('seconds', 'hours'), [(27000, 7.5), (27030, 7.51), (28799, 8), (0, 0)])
+def test_sleep_endpoint_is_authenticated_and_updates_only_sleep(client, integration, seconds, hours):
+    payload = {'date': START.isoformat(), 'sleep_seconds': seconds}
     assert client.post('/api/integrations/garmin/sleep', json=payload).status_code == 401
     original = client.post('/api/entries', json={'date': START.isoformat(), 'steps': 1500, 'knee': 41.2,
         'sleep': 6, 'notes': 'Synthetic rehab note', 'source': 'telegram'}, headers=integration.auth).json()
     first = client.post('/api/integrations/garmin/sleep', json=payload, headers=integration.auth).json()
     repeated = client.post('/api/integrations/garmin/sleep', json=payload, headers=integration.auth).json()
-    assert first == repeated == original | {'sleep': 7.5}
+    assert first == repeated == original | {'sleep': hours}
+    with module.db() as db:
+        assert db.execute('SELECT seconds FROM garmin_sleep WHERE date=?', (START.isoformat(),)).fetchone()[0] == seconds
     status = client.get('/api/integrations', headers=integration.auth).json()['garmin']
     assert status['sleep_imported_days'] == 1 and status['latest_sleep_date'] == START.isoformat()
     for patch in ({'sleep_seconds': -1}, {'sleep_seconds': 86401}, {'sleep_seconds': True},

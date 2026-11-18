@@ -36,6 +36,7 @@ export function today(timezone = 'Asia/Singapore') { return new Intl.DateTimeFor
 export function dateLabel(value: string, full = false) { return new Date(value + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: full ? 'long' : 'short', ...(full ? { year: 'numeric' as const } : {}) }); }
 export function dayDiff(a: string, b: string) { return Math.round((Date.parse(a) - Date.parse(b)) / 86400000); }
 export function fmt(n: number | null | undefined, digits = 1) { return n == null ? '—' : Number(n.toFixed(digits)).toLocaleString('en-GB'); }
+export function fmtMetric(n: number | null | undefined, metric: Metric) { return metric === 'sleep' && n != null ? n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : fmt(n); }
 export function makeEntry(date: string): Omit<Entry, 'id'> { return { date, notes: '', source: 'manual', ...Object.fromEntries([...Object.keys(metrics), 'other_knee', 'other_above5', 'other_above15'].map(k => [k, null])) } as Omit<Entry, 'id'>; }
 export async function api<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}): Promise<T> {
   const res = await fetch('/api' + path, { method, headers: { 'X-Stride-Request': '1', ...(data && !(data instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...headers }, body: data instanceof FormData ? data : data ? JSON.stringify(data) : undefined });
