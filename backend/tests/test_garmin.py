@@ -10,7 +10,7 @@ import pytest
 from backend import app as module
 from backend.tests.test_app import client, login
 from integrations.garmin.worker import (GarminProvider, Journal, SyncError, Worker,
-    batches, daily_totals, due_day, exclusive_worker, next_sync)
+    batches, daily_totals, due_day, exclusive_worker, next_sync, sleep_seconds)
 
 
 START = date(2020, 1, 15)
@@ -28,6 +28,9 @@ class FakeProvider:
         self.values = {}
         self.summary_values = {}
         self.summary_calls = []
+        self.sleep_values = {}
+        self.sleep_calls = []
+        self.sleep_error = None
         self.error = None
 
     def get_daily_steps(self, start, end):
@@ -43,6 +46,12 @@ class FakeProvider:
         self.summary_calls.append(day)
         parsed = date.fromisoformat(day)
         return {'calendarDate': day, 'totalSteps': self.summary_values.get(parsed, self.values.get(parsed, 1000))}
+
+    def get_sleep_data(self, day):
+        self.sleep_calls.append(day)
+        if self.sleep_error:
+            raise SyncError(self.sleep_error)
+        return self.sleep_values.get(date.fromisoformat(day))
 
 
 @pytest.fixture
@@ -242,3 +251,104 @@ def test_missing_session_requires_interactive_setup_without_network(tmp_path, mo
         GarminConnectTooManyRequestsError=RateError))
     with pytest.raises(SyncError, match='needs_login'):
         GarminProvider(tmp_path)
+
+
+def sleep_record(day, seconds=27000, **extra):
+    return {'dailySleepDTO': {'calendarDate': day.isoformat(), 'sleepTimeSeconds': seconds, **extra}}
+
+
+def test_sleep_endpoint_is_authenticated_and_updates_only_sleep(client, integration):
+    payload = {'date': START.isoformat(), 'sleep_seconds': 27000}
+    assert client.post('/api/integrations/garmin/sleep', json=payload).status_code == 401
+    original = client.post('/api/entries', json={'date': START.isoformat(), 'steps': 1500, 'knee': 41.2,
+        'sleep': 6, 'notes': 'Synthetic rehab note', 'source': 'telegram'}, headers=integration.auth).json()
+    first = client.post('/api/integrations/garmin/sleep', json=payload, headers=integration.auth).json()
+    repeated = client.post('/api/integrations/garmin/sleep', json=payload, headers=integration.auth).json()
+    assert first == repeated == original | {'sleep': 7.5}
+    status = client.get('/api/integrations', headers=integration.auth).json()['garmin']
+    assert status['sleep_imported_days'] == 1 and status['latest_sleep_date'] == START.isoformat()
+    for patch in ({'sleep_seconds': -1}, {'sleep_seconds': 86401}, {'sleep_seconds': True},
+                  {'sleep_seconds': 1.5}, {'sleep_seconds': None}, {'steps': 99}):
+        assert client.post('/api/integrations/garmin/sleep', json=payload | patch, headers=integration.auth).status_code == 422
+
+
+def test_sleep_conversion_uses_duration_and_calendar_date_without_adding_awake_or_naps():
+    payload = sleep_record(START, 27030, napTimeSeconds=3600, awakeSleepSeconds=1800,
+                           sleepStartTimestampLocal=1, sleepEndTimestampLocal=9999999999)
+    assert sleep_seconds(payload, START) == 27030
+    with pytest.raises(SyncError, match='invalid_data'):
+        sleep_seconds(payload, START - timedelta(days=1))
+    for seconds in (-1, 86401, 1.5, True, '27000'):
+        with pytest.raises(SyncError, match='invalid_data'):
+            sleep_seconds(sleep_record(START, seconds), START)
+
+
+@pytest.mark.parametrize('payload', [None, {}, {'dailySleepDTO': None}, sleep_record(START, None),
+                                   sleep_record(START, 0), sleep_record(START, 0, sleepWindowConfirmed=False)])
+def test_missing_sleep_and_zero_placeholders_are_not_imported(payload):
+    assert sleep_seconds(payload, START) is None
+    assert sleep_seconds(sleep_record(START, 0, sleepWindowConfirmed=True), START) == 0
+
+
+def test_sleep_backfills_using_existing_step_checkpoint_without_resyncing_steps(client, integration, tmp_path):
+    x = integration
+    assert x.worker.tick(at(17, 12))
+    # Simulate a pre-sleep version's database: step checkpoints remain, sleep
+    # checkpoints/cycle do not exist yet.
+    x.worker.db.execute('DROP TABLE sleep_days')
+    x.worker.db.execute("DELETE FROM state WHERE key LIKE 'sleep_%'")
+    x.worker.db.commit()
+    x.provider.sleep_values[START] = sleep_record(START, 27000)
+    x.provider.sleep_values[START + timedelta(days=1)] = sleep_record(START + timedelta(days=1), 25200)
+    x.provider.calls.clear()
+    upgraded = Worker(tmp_path / 'worker', START, x.journal, provider_factory=lambda _: x.provider, sleeper=lambda _: None)
+    try:
+        assert upgraded.tick(at(17, 13))
+        assert x.provider.calls == []
+        assert upgraded.sleep_pending == 0
+        entries = [entry for entry in client.get('/api/entries', headers=x.auth).json() if entry['date'].startswith('2020-')]
+        assert [entry['sleep'] for entry in entries] == [7.5, 7]
+        assert all(entry['steps'] == 1000 for entry in entries)
+    finally:
+        upgraded.db.close()
+
+
+def test_sleep_missing_retries_and_late_uploads_update_the_same_day(client, integration):
+    x = integration
+    assert x.worker.tick(at(16, 12))
+    assert x.worker.sleep_pending == 1
+    assert x.worker.tick(at(16, 12, 30))
+    assert x.provider.sleep_calls == [START.isoformat()]
+    x.provider.sleep_values[START] = sleep_record(START, 27000)
+    assert x.worker.tick(at(16, 13))
+    x.provider.sleep_values[START] = sleep_record(START, 28800)
+    assert x.worker.tick(at(16, 23, 59))
+    entry = next(entry for entry in client.get('/api/entries', headers=x.auth).json() if entry['date'] == START.isoformat())
+    assert entry['sleep'] == 8 and entry['steps'] == 1000
+
+
+def test_sleep_failure_does_not_pause_nightly_steps(integration):
+    x = integration
+    x.provider.sleep_error = 'garmin_connection'
+    assert not x.worker.tick(at(16, 23, 58))
+    assert x.worker.get('retry_until') == '0'
+    assert x.worker.tick(at(16, 23, 59)) is False
+    assert x.provider.summary_calls == ['2020-01-16']
+    assert x.worker.db.execute("SELECT steps FROM days WHERE date='2020-01-16'").fetchone()[0] == 1000
+    x.provider.sleep_error = None
+    assert x.worker.tick(at(17, 0, 4))
+
+
+def test_one_bad_sleep_date_does_not_block_other_dates(client, integration):
+    x = integration
+    x.provider.sleep_values[START] = sleep_record(START + timedelta(days=1))
+    day = START + timedelta(days=1)
+    x.provider.sleep_values[day] = sleep_record(day)
+    assert not x.worker.tick(at(17, 12))
+    entries = client.get('/api/entries', headers=x.auth).json()
+    assert next(entry for entry in entries if entry['date'] == START.isoformat())['sleep'] is None
+    assert next(entry for entry in entries if entry['date'] == day.isoformat())['sleep'] == 7.5
+    assert x.worker.pending == 0 and x.worker.sleep_pending == 1
+    x.provider.sleep_values[START] = sleep_record(START)
+    assert x.worker.tick(at(17, 12, 5))
+    assert x.worker.sleep_pending == 0

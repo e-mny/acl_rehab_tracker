@@ -61,6 +61,7 @@ def initialize():
         CREATE TABLE IF NOT EXISTS photo_jobs (photo_id TEXT PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE,
             side TEXT NOT NULL, analysis_id TEXT NOT NULL, state TEXT NOT NULL, available_at REAL NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS garmin_steps (date TEXT PRIMARY KEY, steps INTEGER NOT NULL, synced_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS garmin_sleep (date TEXT PRIMARY KEY, seconds INTEGER NOT NULL, synced_at REAL NOT NULL);
         ''')
         c.execute('INSERT OR IGNORE INTO settings VALUES (?,?)', ('profile', json.dumps(Profile().model_dump(mode='json'))))
         seed = Path(__file__).with_name('seed_history.json')
@@ -260,12 +261,18 @@ class GarminSteps(StrictModel):
     steps: int = Field(strict=True, ge=0, le=100000)
 
 
+class GarminSleep(StrictModel):
+    date: date
+    sleep_seconds: int = Field(strict=True, ge=0, le=86400)
+
+
 class GarminHeartbeat(StrictModel):
     state: Literal['idle', 'syncing', 'error', 'needs_login', 'rate_limited']
     start_date: date
     timezone: str = Field(max_length=80)
     next_sync: float = Field(ge=0)
     pending_days: int = Field(ge=0)
+    pending_sleep_days: int = Field(default=0, ge=0)
     error_code: Literal['needs_login', 'rate_limited', 'garmin_connection', 'invalid_data',
                         'journal_auth', 'journal_connection', 'unexpected'] | None = None
 
@@ -656,9 +663,10 @@ def integration_status():
     garmin = json.loads(setting('garmin_heartbeat') or '{}')
     with db() as c:
         imports = dict(c.execute('SELECT COUNT(*) AS imported_days, MAX(date) AS latest_date, MAX(synced_at) AS last_import_at FROM garmin_steps').fetchone())
+        sleep_imports = dict(c.execute('SELECT COUNT(*) AS sleep_imported_days, MAX(date) AS latest_sleep_date, MAX(synced_at) AS last_sleep_import_at FROM garmin_sleep').fetchone())
     return {'pose': {'configured': bool(url), 'available': available},
             'telegram': {**bot, 'online': bool(bot and time.time() - bot.get('last_seen', 0) < 120)},
-            'garmin': {**garmin, **imports, 'online': bool(garmin and time.time() - garmin.get('last_seen', 0) < 180)}}
+            'garmin': {**garmin, **imports, **sleep_imports, 'online': bool(garmin and time.time() - garmin.get('last_seen', 0) < 180)}}
 
 
 @app.post('/api/integrations/telegram/heartbeat', dependencies=[Depends(authorized)])
@@ -689,6 +697,20 @@ def garmin_heartbeat(heartbeat: GarminHeartbeat):
     with db() as c:
         set_setting(c, 'garmin_heartbeat', json.dumps({**heartbeat.model_dump(mode='json'), 'last_seen': time.time()}))
     return {'ok': True}
+
+
+@app.post('/api/integrations/garmin/sleep', dependencies=[Depends(authorized)])
+def import_garmin_sleep(measurement: GarminSleep):
+    with db() as c:
+        c.execute('BEGIN IMMEDIATE')
+        exists = c.execute('SELECT 1 FROM entries WHERE date=?', (str(measurement.date),)).fetchone()
+        values = {'sleep': measurement.sleep_seconds / 3600}
+        if not exists:
+            values['source'] = 'api'
+        entry = merge_entry(c, measurement.date, values, write=True)['entry']
+        c.execute('INSERT INTO garmin_sleep VALUES (?,?,?) ON CONFLICT(date) DO UPDATE SET seconds=excluded.seconds,synced_at=excluded.synced_at',
+                  (str(measurement.date), measurement.sleep_seconds, time.time()))
+    return entry
 
 
 async def perform_photo_analysis(identifier, side, analysis_id):

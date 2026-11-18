@@ -27,7 +27,8 @@ export type IntegrationStatus = {
   telegram: { online: boolean; username?: string; last_seen?: number };
   garmin?: { online: boolean; state?: 'idle' | 'syncing' | 'error' | 'needs_login' | 'rate_limited';
     imported_days: number; latest_date?: string | null; last_import_at?: number | null;
-    start_date?: string; timezone?: string; next_sync?: number; pending_days?: number; error_code?: string | null };
+    sleep_imported_days?: number; latest_sleep_date?: string | null; last_sleep_import_at?: number | null;
+    start_date?: string; timezone?: string; next_sync?: number; pending_days?: number; pending_sleep_days?: number; error_code?: string | null };
 };
 export type EntryPreview = { entry: Entry; existing: Entry | null; version: string };
 export const emptyProfile: Profile = { name: '', start_date: null, side: 'unspecified', context: '', timezone: 'Asia/Singapore' };

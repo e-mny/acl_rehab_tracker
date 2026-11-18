@@ -1,4 +1,4 @@
-"""Scheduled, steps-only Garmin imports with persistent backfill checkpoints."""
+"""Scheduled Garmin step and sleep imports with persistent backfill checkpoints."""
 import argparse
 from contextlib import contextmanager, suppress
 from datetime import UTC, date, datetime, time as wall_time, timedelta
@@ -76,6 +76,36 @@ def daily_totals(payload, start, end):
     return totals
 
 
+def sleep_seconds(payload, day):
+    """Read Garmin's main-sleep duration, keeping its calendar date intact."""
+    if payload is None:
+        return None
+    if not isinstance(payload, dict):
+        raise SyncError('invalid_data')
+    if payload.get('privacyProtected') is True:
+        raise SyncError('needs_login')
+    record = payload.get('dailySleepDTO')
+    if record is None:
+        return None
+    if not isinstance(record, dict):
+        raise SyncError('invalid_data')
+    value = record.get('sleepTimeSeconds')
+    if value is None:
+        return None
+    if type(value) is not int or not 0 <= value <= 86400:
+        raise SyncError('invalid_data')
+    # Garmin can return an empty zero-duration placeholder for an untracked night.
+    if value == 0 and record.get('sleepWindowConfirmed') is not True:
+        return None
+    try:
+        recorded_day = date.fromisoformat(record['calendarDate'])
+    except (KeyError, TypeError, ValueError):
+        raise SyncError('invalid_data') from None
+    if recorded_day != day:
+        raise SyncError('invalid_data')
+    return value
+
+
 class GarminProvider:
     def __init__(self, token_dir, *, interactive=False):
         from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectConnectionError, GarminConnectTooManyRequestsError
@@ -117,6 +147,11 @@ class GarminProvider:
         self.call(self.client.client.dump, str(self.token_dir))
         return result
 
+    def get_sleep_data(self, day):
+        result = self.call(self.client.get_sleep_data, day)
+        self.call(self.client.client.dump, str(self.token_dir))
+        return result
+
 
 class Journal:
     def __init__(self, url, token, client=None):
@@ -147,11 +182,13 @@ class Worker:
         self.db.row_factory = sqlite3.Row
         self.db.executescript('''
           CREATE TABLE IF NOT EXISTS days (date TEXT PRIMARY KEY, state TEXT NOT NULL, steps INTEGER, retry_at REAL NOT NULL DEFAULT 0);
+          CREATE TABLE IF NOT EXISTS sleep_days (date TEXT PRIMARY KEY, state TEXT NOT NULL, seconds INTEGER, retry_at REAL NOT NULL DEFAULT 0);
           CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         ''')
         self.provider_factory, self.provider, self.sleeper = provider_factory, None, sleeper
         self.timezone = 'UTC'
         self.pending = 0
+        self.sleep_pending = 0
 
     def get(self, key, default=''):
         row = self.db.execute('SELECT value FROM state WHERE key=?', (key,)).fetchone()
@@ -165,7 +202,72 @@ class Worker:
         self.journal.request('POST', '/integrations/garmin/heartbeat', {
             'state': state, 'start_date': self.start_date.isoformat(), 'timezone': self.timezone,
             'next_sync': next_sync(now.astimezone(ZoneInfo(self.timezone))).timestamp(),
-            'pending_days': self.pending, 'error_code': error})
+            'pending_days': self.pending, 'pending_sleep_days': self.sleep_pending, 'error_code': error})
+
+    def pending_sleep_days(self, end):
+        expected = max(0, (end - self.start_date).days + 1)
+        imported = self.db.execute("SELECT COUNT(*) FROM sleep_days WHERE date>=? AND date<=? AND state='synced'",
+                                   (self.start_date.isoformat(), end.isoformat())).fetchone()[0]
+        return expected - imported
+
+    def sync_sleep(self, now, end, cycle, *, force=False):
+        """Sleep retries have their own backoff so they cannot stall daily steps."""
+        existing = {date.fromisoformat(row['date']): row for row in self.db.execute('SELECT * FROM sleep_days')}
+        self.sleep_pending = self.pending_sleep_days(end)
+        if not force and float(self.get('sleep_retry_until', '0')) > now.timestamp():
+            return False
+        try:
+            candidates = {day for day in day_range(self.start_date, end)
+                          if day not in existing or existing[day]['state'] != 'synced' and existing[day]['retry_at'] <= now.timestamp()}
+            if force:
+                candidates.update(day_range(self.start_date, end))
+            elif self.get('sleep_cycle') != cycle:
+                candidates.update(day_range(max(self.start_date, end - timedelta(days=6)), end))
+            invalid = False
+            if candidates:
+                self.heartbeat(now, 'syncing')
+                if self.provider is None:
+                    self.provider = self.provider_factory(self.directory / 'tokens')
+                for index, day in enumerate(sorted(candidates)):
+                    if index:
+                        self.sleeper(1)
+                    if index and index % 10 == 0:
+                        self.heartbeat(now, 'syncing')
+                    try:
+                        seconds = sleep_seconds(self.provider.get_sleep_data(day.isoformat()), day)
+                    except SyncError as error:
+                        if error.code != 'invalid_data':
+                            raise
+                        # One malformed night must not prevent later dates importing.
+                        self.db.execute("INSERT INTO sleep_days VALUES (?,'invalid',NULL,?) ON CONFLICT(date) DO UPDATE SET state='invalid',retry_at=excluded.retry_at",
+                                        (day.isoformat(), now.timestamp() + 300))
+                        self.db.commit()
+                        invalid = True
+                        continue
+                    if seconds is not None:
+                        self.journal.request('POST', '/integrations/garmin/sleep', {'date': day.isoformat(), 'sleep_seconds': seconds})
+                        self.db.execute("INSERT INTO sleep_days VALUES (?,'synced',?,0) ON CONFLICT(date) DO UPDATE SET state='synced',seconds=excluded.seconds,retry_at=0",
+                                        (day.isoformat(), seconds))
+                    else:
+                        self.db.execute("INSERT INTO sleep_days VALUES (?,'missing',NULL,?) ON CONFLICT(date) DO UPDATE SET state='missing',retry_at=excluded.retry_at",
+                                        (day.isoformat(), now.timestamp() + 3600))
+                    self.db.commit()
+            self.set('sleep_cycle', cycle)
+            if invalid:
+                raise SyncError('invalid_data')
+            self.set('sleep_retry_until', 0)
+            self.set('sleep_error_code', '')
+            return True
+        except Exception as error:
+            code = error.code if isinstance(error, SyncError) else 'unexpected'
+            if code in ('needs_login', 'rate_limited'):
+                raise
+            self.set('sleep_error_code', code)
+            self.set('sleep_retry_until', now.timestamp() + 300)
+            logger.warning('Garmin sleep import paused (%s). Steps remain independently scheduled.', code)
+            return False
+        finally:
+            self.sleep_pending = self.pending_sleep_days(end)
 
     def tick(self, now=None, *, force=False):
         now = now or datetime.now(UTC)
@@ -177,6 +279,7 @@ class Worker:
             end = due_day(local)
             existing = {date.fromisoformat(row['date']): row for row in self.db.execute('SELECT * FROM days')}
             self.pending = sum(day not in existing or existing[day]['state'] != 'synced' for day in day_range(self.start_date, end))
+            self.sleep_pending = self.pending_sleep_days(end)
             if not force and float(self.get('retry_until', '0')) > now.timestamp():
                 code = self.get('error_code', 'unexpected')
                 self.heartbeat(now, state=code if code in ('needs_login', 'rate_limited') else 'error', error=code)
@@ -217,8 +320,9 @@ class Worker:
             self.set('cycle', cycle)
             self.set('retry_until', 0)
             self.set('error_code', '')
-            self.heartbeat(now)
-            return True
+            sleep_ok = self.sync_sleep(now, end, cycle, force=force)
+            self.heartbeat(now, state='idle' if sleep_ok else 'error', error=None if sleep_ok else self.get('sleep_error_code', 'unexpected'))
+            return sleep_ok
         except Exception as error:
             code = error.code if isinstance(error, SyncError) else 'unexpected'
             self.provider = None
@@ -259,7 +363,7 @@ def main():
                 GarminProvider(directory / 'tokens', interactive=True)
             except Exception:
                 raise SystemExit('Garmin login failed. Check the credentials/MFA or wait if rate limited; private details were not logged.') from None
-            print('Garmin session saved. Start the Garmin service to import steps.')
+            print('Garmin session saved. Start the Garmin service to import steps and sleep.')
             return
         try:
             start = date.fromisoformat(os.environ.get('GARMIN_START_DATE', ''))
@@ -277,10 +381,10 @@ def main():
             if args.sync:
                 if not worker.tick(force=True):
                     raise SystemExit('Import incomplete. Inspect the Garmin integration status and retry after resolving the connection/login issue.')
-                if worker.pending:
-                    print('Available steps imported; some days have no Garmin reading yet and will be retried by the service.')
+                if worker.pending or worker.sleep_pending:
+                    print('Available steps and sleep imported; some readings are missing and will be retried by the service.')
                 else:
-                    print('All due step totals imported.')
+                    print('All due steps and sleep durations imported.')
                 return
             while not stop.is_set():
                 worker.tick()
