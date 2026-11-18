@@ -1,3 +1,4 @@
 -r requirements.txt
+-r ../integrations/telegram/requirements.txt
 pytest==9.0.1
 httpx==0.28.1

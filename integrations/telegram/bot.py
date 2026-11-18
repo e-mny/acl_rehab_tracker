@@ -64,8 +64,9 @@ class Bot:
             raise ServiceError(response.status_code, str(detail))
         return response.json() if response.content else None
 
-    def telegram(self, method, **payload):
-        response = self.client.post('https://api.telegram.org/bot' + self.token + '/' + method, json=payload)
+    def telegram(self, method, *, files=None, **payload):
+        body = {'data': payload, 'files': files} if files is not None else {'json': payload}
+        response = self.client.post('https://api.telegram.org/bot' + self.token + '/' + method, **body)
         # Never include URLs or Telegram error bodies in logs: the URL contains a bot token.
         if not response.is_success:
             raise ServiceError(response.status_code, 'Telegram could not complete this request.')
@@ -85,6 +86,26 @@ class Bot:
     def offset(self):
         row = self.db.execute("SELECT value FROM state WHERE key='offset'").fetchone()
         return int(row['value']) if row else 0
+
+    def send_graph(self, arguments, message):
+        from .graphs import parse_graph_args, render_graph
+        chat_id, thread_id = message['chat']['id'], message.get('message_thread_id', 0)
+        try:
+            request = parse_graph_args(arguments)
+            as_of = None
+            if request.days is not None:
+                profile = self.stride('/profile')
+                as_of = datetime.fromtimestamp(message.get('date', time.time()), ZoneInfo(profile['timezone'])).date()
+            content, caption = render_graph(self.stride('/entries'), request, as_of=as_of)
+            payload = {'chat_id': chat_id, 'caption': caption}
+            if thread_id:
+                payload['message_thread_id'] = thread_id
+            self.telegram('sendPhoto', files={'photo': ('stride-graph.png', content, 'image/png')}, **payload)
+        except ValueError as error:
+            self.send(str(error), chat_id=chat_id, thread_id=thread_id)
+        except (ServiceError, httpx.HTTPError):
+            self.send('Could not create or send the graph. Check the journal connection, API token and Telegram access, then try /graph again.',
+                      chat_id=chat_id, thread_id=thread_id)
 
     def set_offset(self, offset):
         self.db.execute("INSERT INTO state VALUES ('offset',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(offset),))
@@ -139,10 +160,13 @@ class Bot:
             # Privacy mode can stay enabled. Plain check-ins/photos are accepted
             # as replies to this bot; ordinary group conversation is ignored.
             replying_to_bot = self.bot_id is not None and message.get('reply_to_message', {}).get('from', {}).get('id') == self.bot_id
-            if command not in ('start', 'help', 'whoami', 'cancel', 'log') and not (command is None and replying_to_bot):
+            if command not in ('start', 'help', 'whoami', 'cancel', 'log', 'graph') and not (command is None and replying_to_bot):
                 return
         if command in ('start', 'help'):
             reply(HELP)
+            return
+        if command == 'graph':
+            self.send_graph(text, message)
             return
         if command == 'whoami':
             reply(f'Your Telegram user ID: {self.user_id}\nChat ID: {chat_id}')

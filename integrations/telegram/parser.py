@@ -30,7 +30,9 @@ HELP = ('Send one day at a time, for example:\n/log\nknee: 41.2\n+5: 43.7\n+15: 
         'Every entry and photo needs Save confirmation. /cancel cancels your latest pending draft in this chat/topic. '
         '/whoami shows your user and chat IDs. In groups, use /log@BotUsername followed by your measurements, '
         'or reply to a message from this bot with measurements or a photo. Replace BotUsername with this bot\'s username. '
-        'Group previews and replies are visible to group members; only the allowed user can save.')
+        'Use /graph for a circumference chart picture, /graph 30 for the last 30 days, '
+        'or /graph motion / /graph pain for other charts. In groups, use /graph@BotUsername. '
+        'Group previews and replies are visible to group members; only the allowed user can save or request graphs.')
 
 
 def parse_date(text):

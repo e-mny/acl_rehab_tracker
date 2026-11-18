@@ -165,6 +165,18 @@ Available commands:
 | `/log` | Optional prefix for a multiline check-in. |
 | `/cancel` | Cancel the latest pending draft in the current chat/topic. |
 | `/whoami` | Show the allowed user's numeric Telegram ID and current chat ID. |
+| `/graph` | Send all saved circumference measurements as a chart picture. |
+| `/graph 30` | Send circumference measurements from the last 30 calendar days. |
+| `/graph motion 90` | Send flexion and signed extension charts for the last 90 days. |
+| `/graph pain` | Send pain-at-rest and pain-with-activity charts. |
+
+### Measurement graph pictures
+
+Use `/graph [circumference|motion|pain] [1–365|all]`. Omitting the range shows all saved measurements. Day ranges include the command's date in the journal time zone and exclude future dates. The chart includes only recorded values: missing readings remain gaps, zero pain is retained, and negative extension values represent hyperextension. Circumference charts show the three measurement locations in separate panels, with comparison-leg readings only on the dates they were recorded.
+
+In a group, send `/graph@YourBotUsername`, optionally followed by a metric group and day range. Only the configured user can request a chart. The image is returned to the originating chat and forum topic and is visible to its members. Rendering happens locally in memory, then the PNG is uploaded to Telegram using [sendPhoto](https://core.telegram.org/bots/api#sendphoto). No public chart URL is needed. Graph requests do not modify journal entries or create photo-journal records or confirmation drafts.
+
+The chart excludes profile names, free-text notes and uploaded photos. Empty measurement sets return a text message instead of an empty image. Bot charts require the updated Telegram worker image; rebuild or publish it before using the new command.
 
 ## Telegram photos
 
